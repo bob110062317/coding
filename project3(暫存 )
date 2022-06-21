@@ -1,0 +1,302 @@
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
+#include <ctime>
+#include <array>
+#include <set>
+#include <algorithm>
+#define top 2
+using namespace std;
+
+int alpha_beta(int depth, int alpha, int beta, bool maximize,set<pair<int,int>> next_move, int cc);
+void write_valid_spot(std::ofstream& fout);
+int evaluate();
+
+
+
+enum SPOT_STATE {
+    EMPTY = 0,
+    BLACK = 1,
+    WHITE = 2,
+    TMP_B = 3,
+    TMP_W = 4
+};
+
+const int SIZE = 15;
+std::array<std::array<int, SIZE>, SIZE> board;
+int c;
+int K[4]={1,0,1,1};
+int T[4]={1,1,0,-1};
+pair<int,int> play;
+int player;
+int opponent;
+
+
+void read_board(std::ifstream& fin) {
+    fin >> player;
+    for (int i = 0; i < SIZE; i++) {
+        for (int j = 0; j < SIZE; j++) {
+            fin >> board[i][j];
+        }
+    }
+}
+
+
+
+
+
+int main(int, char** argv) {
+    std::ifstream fin(argv[1]);
+    std::ofstream fout(argv[2]);
+    read_board(fin);
+    write_valid_spot(fout);
+    fin.close();
+    fout.close();
+    return 0;
+}
+
+
+
+
+int alpha_beta(int d, int alpha, int beta, bool maximize,set<pair<int,int>> next_move, int cc){
+	if(d == 0)      return evaluate();
+
+	if(maximize){
+		int value = -10000;
+			
+		for(auto i:next_move){
+            board[i.first][i.second] = player+2;
+
+            set<pair<int,int>> next(next_move);
+
+            for(int s = i.first-1; s<=i.first+1; s++){
+                for(int b = i.second-1; b<=i.second+1; b++){
+                    if(s>=0 && s<SIZE && b>=0 && b<SIZE && board[s][b] == EMPTY){
+                            next.insert(make_pair(s,b));
+                    }
+                }
+            }
+            next.erase(i);
+            int temp = alpha_beta( d-1, alpha,beta, false, next, cc+1);
+            if(temp>value){
+                value = temp;
+                if(d==top)  play = make_pair(i.first,i.second);
+            }
+
+            alpha = max(alpha,value);
+            board[i.first][i.second] = EMPTY;
+            if(alpha>=beta)break;
+        }
+        
+        return value;
+	}
+    else{
+        int value = 10000;
+        for(auto i:next_move){
+            board[i.first][i.second] = opponent+2;
+
+            set<pair<int,int>> next(next_move);
+            for(int s = i.first-1; s<=i.first+1; s++){
+                for(int b = i.second-1; b<=i.second+1; b++){
+                    if(s>=0 && s<SIZE && b>=0 && b<SIZE && board[s][b] == EMPTY){
+                            next.insert(make_pair(s,b));
+                    }
+                }
+            }
+            next.erase(i);
+            value = min(value,alpha_beta( d-1, alpha, beta, true, next,cc+1));
+            beta = min(beta,value);
+            board[i.first][i.second] = EMPTY;
+            if(beta<=alpha)break;
+        }
+        return value;
+
+    }
+}
+
+
+void write_valid_spot(std::ofstream& fout){
+    
+    c=0;
+	if(player == BLACK)  opponent = WHITE;
+	else opponent = BLACK;
+    set<pair<int,int>> next_move;
+    for(int i = 0; i<SIZE; i++){
+		for(int j = 0; j<SIZE; j++){
+			if(board[i][j] != EMPTY ){
+                if(board[i][j] == player )  c++;
+                for(int s = i-1; s<=i+1; s++){
+                    for(int b = j-1; b<=j+1; b++){
+                        if(s>=0 && s<SIZE && b>=0 && b<SIZE && board[s][b] == EMPTY){
+                            next_move.insert(make_pair(s,b));
+                        }
+
+                    }
+                }
+            }
+		}
+	}
+    cout<<c<<endl;
+    if(next_move.empty()){
+        fout <<7 << " " << 7 << std::endl;   
+        fout.flush();
+    }
+    else{
+        alpha_beta(top,-10000,10000,1,next_move,c);
+        fout << play.first << " " << play.second << std::endl; 
+        fout.flush();
+    }
+	
+}
+
+
+
+
+
+int evaluate(){
+
+    int x,y,k,t;
+    int count;
+    int stuck;           
+    int value;
+    for( int i=0; i<SIZE; i++){
+        for( int j=0; j<SIZE; j++){
+            if( board[i][j] == player+2 || board[i][j] == player ){        
+                for(int q=0; q<4; q++){
+                        k=K[q];      
+                        t=T[q];      
+                        x=i,y=j;
+                        count=1;
+                        stuck=0;
+                        x+=k;
+                        y+=t;
+                        while(1){
+                            if( board[x][y] == player || board[x][y] == player+2){
+                                count++;
+                                x+=k;
+                                y+=t;
+                            }else if( board[x][y] == opponent || board[x][y] == opponent+2||x<0 || y<0 || x >=SIZE || y>=SIZE ){
+                                stuck++;
+                                break;
+                            }else break;
+                        }
+
+                        if(count<5){
+                            x=i,y=j;
+                            x-=k;
+                            y-=t;
+                            
+                            
+                            while( x>=0 && y>=0 && x <SIZE && y<SIZE ){
+                            if( board[x][y] == player || board[x][y] == player+2){
+                                count++;
+                                x-=k;
+                                y-=t;
+                            }else if( board[x][y] == opponent || board[x][y] == opponent+2){
+                                stuck++;
+                                break;
+                            }else break;
+                        }
+                        }
+
+
+
+                        if(stuck==2){
+                            if(count>=5){
+                                value+=30;
+                            }
+                        }
+                        else if(stuck==1){
+                            if(count==3){
+                                value += 3;
+                            }else if(count==4){
+                                value += 5;
+                            }else if(count>=5){
+                                value += 50;
+                            }
+                        }else {
+                            /*if(count==2){
+                                value +=5;
+                            }*/
+                            if(count==3){
+                                value +=10;
+                            }else if(count==4){
+                                value += 75;
+                            }else if(count>=5){
+                                value += 100;
+                            }             
+                        }
+                    
+                }    
+
+            }             
+            else if( board[i][j] == opponent+2 ||board[i][j] == opponent){
+                for(int q=0; q<4; q++){
+                        k=K[q];
+                        t=T[q];
+                        x=i,y=j;
+                        count=1;
+                        stuck=0;
+                        x+=k;
+                        y+=t;
+                        while( 1 ){
+                            if( board[x][y] == opponent || board[x][y] == opponent+2){
+                                count++;
+                                x+=k;
+                                y+=t;
+                            }else if( board[x][y] == opponent || board[x][y] == opponent+2||x<0 || y<0 || x >=SIZE || y>=SIZE ){
+                                stuck++;
+                                break;
+                            }else break;
+                        }
+
+                        if(count<5){
+                            x=i,y=j;
+                            x-=k;
+                            y-=t;
+                            
+                            
+                            while( x>=0 && y>=0 && x <SIZE && y<SIZE ){
+                            if( board[x][y] == opponent || board[x][y] == opponent+2){
+                                count++;
+                                x-=k;
+                                y-=t;
+                            }else if( board[x][y] == player || board[x][y] == player+2){
+                                stuck++;
+                                break;
+                            }else break;
+                        }
+                        }
+                        if(stuck==2){
+                            if(count==3) value+=5;
+                            else if(count==4) value+=5;
+                            else if(count>=5) value+=125;
+                        }
+                        else if(stuck==1){
+                            if(count==3){
+                                value -=0;
+                            }else if(count==4){
+                                value -=0;
+                            }else if(count>=5){
+                                value -=125;
+                            }
+                        }
+                        else{
+                            if(count==3){
+                                value -=30;
+                            }else if(count==4){
+                                value -= 125;
+                            }else if(count==5){
+                                value -= 150;
+                            }             
+                        }
+                    
+                }    
+            }
+        }
+    }
+
+
+
+    return value;
+}
